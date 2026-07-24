@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>王者榮耀每日罰款計算器</title>
+    <style>
+        /* ============================================
+           蘋果設計語言 · Design Tokens
+           ============================================ */
+        :root {
+            /* 背景層次 */
+            --bg: #000000;
+            --bg-elevated: #0c0c0e;
+            --surface: rgba(28, 28, 30, 0.72);
+            --surface-light: rgba(44, 44, 46, 0.6);
+            --surface-hover: rgba(58, 58, 60, 0.8);
+
+            /* 邊框與分隔 */
+            --border: rgba(255, 255, 255, 0.08);
+            --border-strong: rgba(255, 255, 255, 0.14);
+
+            /* 文字 */
+            --text: #f5f5f7;
+            --text-secondary: rgba(235, 235, 245, 0.6);
+            --text-tertiary: rgba(235, 235, 245, 0.3);
+
+            /* 強調色 (蘋果系統藍) */
+            --accent: #0a84ff;
+            --accent-glow: rgba(10, 132, 255, 0.45);
+            --success: #30d158;
+            --danger: #ff453a;
+
+            /* 圓角 (蘋果連續圓角) */
+            --radius-sm: 10px;
+            --radius: 18px;
+            --radius-lg: 24px;
+            --radius-xl: 32px;
+
+            /* 緩動曲線 (Spring-like) */
+            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+            --transition: 0.4s var(--ease-smooth);
+
+            /* 陰影 (柔和深度) */
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
+            --shadow-glow: 0 8px 40px var(--accent-glow);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 移除行動裝置 300ms 點擊延遲 */
+        button, select, input {
+            touch-action: manipulation;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* ============================================
+           背景動態極光
+           ============================================ */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+                         'PingFang TC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 28px 16px 72px;
+            min-height: 100vh;
+            position: relative;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+            letter-spacing: -0.01em;
+        }
+
+        /* 極光光暈層 */
+        .aurora {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .aurora-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.5;
+            will-change: transform;
+        }
+
+        .aurora-blob.b1 {
+            width: 60vw;
+            height: 60vw;
+            max-width: 700px;
+            max-height: 700px;
+            top: -20%;
+            left: -15%;
+            background: radial-gradient(circle, rgba(10, 132, 255, 0.35) 0%, transparent 65%);
+            animation: drift1 22s var(--ease-smooth) infinite alternate;
+        }
+
+        .aurora-blob.b2 {
+            width: 55vw;
+            height: 55vw;
+            max-width: 650px;
+            max-height: 650px;
+            bottom: -25%;
+            right: -15%;
+            background: radial-gradient(circle, rgba(191, 90, 242, 0.28) 0%, transparent 65%);
+            animation: drift2 26s var(--ease-smooth) infinite alternate;
+        }
+
+        .aurora-blob.b3 {
+            width: 45vw;
+            height: 45vw;
+            max-width: 500px;
+            max-height: 500px;
+            top: 40%;
+            left: 50%;
+            background: radial-gradient(circle, rgba(48, 209, 88, 0.18) 0%, transparent 65%);
+            animation: drift3 30s var(--ease-smooth) infinite alternate;
+        }
+
+        @keyframes drift1 {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(8%, 6%) scale(1.15); }
+        }
+        @keyframes drift2 {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-7%, -5%) scale(1.12); }
+        }
+        @keyframes drift3 {
+            0%   { transform: translate(-50%, 0) scale(1); }
+            100% { transform: translate(-45%, -8%) scale(1.1); }
+        }
+
+        /* 粒子層 */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.55);
+            border-radius: 50%;
+            pointer-events: none;
+            transition: transform 0.1s linear;
+            will-change: transform, opacity;
+            box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
+        }
+
+        /* ============================================
+           容器
+           ============================================ */
+        .container {
+            width: 100%;
+            max-width: 540px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ============================================
+           標題區
+           ============================================ */
+        .header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            padding: 16px 0 8px;
+            text-align: center;
+            animation: slideDown 0.9s var(--ease-out) both;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-24px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .header h1 {
+            font-size: 2.1rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            color: #fff;
+            background: linear-gradient(180deg, #ffffff 0%, #d0d0d5 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header .subtitle {
+            font-size: 0.92rem;
+            font-weight: 400;
+            color: var(--text-secondary);
+            margin-top: 6px;
+            letter-spacing: 0.02em;
+        }
+
+        .lang-selector {
+            position: absolute;
+            top: 4px;
+            right: 0;
+        }
+
+        .lang-selector select {
+            background: var(--surface);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 6px 26px 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath fill='%238E8E93' d='M0 2l4 4 4-4z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 9px center;
+            background-size: 8px;
+            transition: border-color var(--transition), color var(--transition);
+        }
+
+        .lang-selector select:hover { border-color: var(--border-strong); color: var(--text); }
+        .lang-selector select:focus { outline: none; border-color: var(--accent); }
+
+        /* ============================================
+           玻璃卡片 (Glassmorphism)
+           ============================================ */
+        .card {
+            background: var(--surface);
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 22px;
+            box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+            animation: fadeUp 0.7s var(--ease-out) both;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 卡片頂部高光 */
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+        }
+
+        .card:nth-child(2) { animation-delay: 0.08s; }
+        .card:nth-child(3) { animation-delay: 0.16s; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(28px) scale(0.98); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .card:hover {
+            border-color: var(--border-strong);
+            box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        /* ============================================
+           場次列表
+           ============================================ */
+        .match-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .match-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--surface-light);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 11px 10px;
+            border-radius: var(--radius-sm);
+            border: 1px solid transparent;
+            transition: border-color var(--transition), transform var(--transition), background var(--transition);
+            animation: fadeUp 0.4s var(--ease-spring) both;
+            flex-wrap: wrap;
+        }
+
+        .match-item:hover {
+            background: var(--surface-hover);
+            transform: translateY(-1px);
+        }
+
+        .match-item:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15);
+        }
+
+        .match-item select,
+        .match-item input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 8px;
+            padding: 7px 4px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            transition: border-color var(--transition), box-shadow var(--transition);
+        }
+
+        .match-item select:focus,
+        .match-item input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2);
+            outline: none;
+        }
+
+        .lane-select {
+            width: 72px;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%238E8E93' d='M0 3l5 5 5-5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+            background-size: 8px;
+            padding-right: 18px;
+        }
+
+        .kda-inputs {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .kda-inputs input {
+            width: 38px;
+            text-align: center;
+            padding: 7px 2px;
+        }
+
+        .kda-inputs span {
+            font-size: 0.72rem;
+            color: var(--text-tertiary);
+            user-select: none;
+        }
+
+        .mvp-select,
+        .badge-select {
+            width: 82px;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath fill='%238E8E93' d='M0 2l4 4 4-4z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 6px center;
+            background-size: 8px;
+            padding-right: 18px;
+        }
+
+        .match-kda-display {
+            font-size: 0.8rem;
+            color: var(--accent);
+            min-width: 48px;
+            text-align: center;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .btn-icon {
+            background: transparent;
+            border: none;
+            color: var(--text-tertiary);
+            font-size: 1.15rem;
+            cursor: pointer;
+            padding: 4px 7px;
+            border-radius: 7px;
+            transition: all var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-icon:hover {
+            color: var(--danger);
+            background: rgba(255, 69, 58, 0.12);
+        }
+
+        .btn-add {
+            background: transparent;
+            border: 1px dashed var(--border-strong);
+            color: var(--text-secondary);
+            padding: 13px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.88rem;
+            font-weight: 500;
+            transition: all var(--transition);
+            width: 100%;
+            margin-top: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-add:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(10, 132, 255, 0.06);
+        }
+
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(0);
+            animation: ripple-anim 0.65s var(--ease-out);
+            pointer-events: none;
+        }
+
+        @keyframes ripple-anim {
+            to { transform: scale(4); opacity: 0; }
+        }
+
+        /* ============================================
+           設定區 (摺疊面板)
+           ============================================ */
+        .settings-card {
+            background: var(--surface);
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            transition: border-color var(--transition);
+            box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 22px;
+            cursor: pointer;
+            user-select: none;
+            transition: background var(--transition);
+        }
+
+        .settings-header:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .settings-header h2 {
+            font-size: 1.02rem;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -0.01em;
+        }
+
+        .toggle-icon {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            transition: transform 0.4s var(--ease-spring);
+        }
+
+        .collapsed .settings-body {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            opacity: 0;
+        }
+
+        .settings-body {
+            padding: 0 22px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 2000px;
+            opacity: 1;
+            transition: max-height 0.5s var(--ease-smooth), padding 0.5s var(--ease-smooth), opacity 0.4s var(--ease-smooth);
+            overflow: hidden;
+        }
+
+        .collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .settings-hint {
+            font-size: 0.76rem;
+            color: var(--text-secondary);
+            line-height: 1.65;
+            padding: 12px 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .setting-row label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            width: auto;
+            min-width: 55px;
+            font-weight: 500;
+        }
+
+        .setting-row input {
+            width: 66px;
+            padding: 6px 4px;
+            text-align: center;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.3);
+            color: var(--text);
+            font-size: 0.82rem;
+            font-weight: 500;
+            transition: border-color var(--transition), box-shadow var(--transition);
+        }
+
+        .setting-row input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2);
+        }
+
+        .badge-matrix {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .badge-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+        }
+
+        .badge-row .lane-label {
+            width: 55px;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        .badge-row input {
+            width: 50px;
+        }
+
+        .btn-reset {
+            background: transparent;
+            border: 1px solid var(--border-strong);
+            color: var(--text-secondary);
+            padding: 7px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.82rem;
+            font-weight: 500;
+            transition: all var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-reset:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* ============================================
+           計算按鈕 (磁吸效果)
+           ============================================ */
+        .btn-calculate {
+            background: linear-gradient(180deg, #0a84ff 0%, #0066d6 100%);
+            border: none;
+            color: #fff;
+            padding: 17px;
+            border-radius: var(--radius);
+            font-size: 1.08rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            transition: transform 0.3s var(--ease-spring), box-shadow var(--transition), filter var(--transition);
+            box-shadow: var(--shadow-glow), 0 4px 14px rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            will-change: transform;
+        }
+
+        .btn-calculate::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -75%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+            transform: skewX(-20deg);
+            transition: left 0.8s var(--ease-out);
+        }
+
+        .btn-calculate:hover {
+            filter: brightness(1.08);
+            box-shadow: 0 12px 44px var(--accent-glow), 0 4px 14px rgba(0, 0, 0, 0.5);
+        }
+
+        .btn-calculate:hover::after {
+            left: 125%;
+        }
+
+        .btn-calculate:active {
+            transform: scale(0.96);
+        }
+
+        /* ============================================
+           結果卡片
+           ============================================ */
+        .result-card {
+            display: none;
+            flex-direction: column;
+            gap: 14px;
+            animation: resultPop 0.6s var(--ease-spring) both;
+        }
+
+        @keyframes resultPop {
+            0%   { opacity: 0; transform: translateY(24px) scale(0.95); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .result-card.show {
+            display: flex;
+        }
+
+        .result-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.95rem;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .result-summary:last-of-type {
+            border-bottom: none;
+        }
+
+        .result-summary strong {
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+        }
+
+        .detail-table {
+            width: 100%;
+            font-size: 0.8rem;
+            border-collapse: collapse;
+            margin: 8px 0;
+        }
+
+        .detail-table th, .detail-table td {
+            padding: 8px 4px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .detail-table th {
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .detail-table tbody tr {
+            transition: background var(--transition);
+        }
+
+        .detail-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .result-fine {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            text-align: center;
+            padding: 14px 0 4px;
+            letter-spacing: -0.02em;
+            text-shadow: 0 0 24px var(--accent-glow);
+            font-variant-numeric: tabular-nums;
+            background: linear-gradient(180deg, #ffffff 0%, #a0c8ff 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .text-muted {
+            color: var(--text-tertiary);
+            font-size: 0.78rem;
+        }
+
+        .mt-2 { margin-top: 10px; }
+
+        /* ============================================
+           滾動揭示動畫
+           ============================================ */
+        .reveal {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ============================================
+           螢幕小鍵盤 (Numeric Keypad)
+           ============================================ */
+        .keypad {
+            position: fixed;
+            left: 50%;
+            bottom: 16px;
+            transform: translateX(-50%) translateY(160%);
+            width: calc(100% - 32px);
+            max-width: 248px;
+            background: var(--surface);
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius);
+            padding: 10px;
+            box-shadow: var(--shadow-lg);
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.45s var(--ease-spring), opacity 0.3s var(--ease-smooth);
+        }
+        .keypad.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .keypad-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 0 4px;
+        }
+        .keypad-label {
+            font-size: 0.74rem;
+            color: var(--text-secondary);
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+        .keypad-done {
+            background: rgba(10, 132, 255, 0.15);
+            border: none;
+            color: var(--accent);
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 5px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background var(--transition);
+        }
+        .keypad-done:hover { background: rgba(10, 132, 255, 0.28); }
+        .keypad-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+        .key {
+            position: relative;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 1.05rem;
+            font-weight: 700;
+            padding: 11px 0;
+            border-radius: 10px;
+            cursor: pointer;
+            font-variant-numeric: tabular-nums;
+            transition: transform 0.15s var(--ease-spring), background var(--transition), color var(--transition);
+            user-select: none;
+            touch-action: manipulation;
+        }
+        .key:hover { background: rgba(255, 255, 255, 0.13); }
+        .key:active { transform: scale(0.9); background: var(--accent); color: #fff; }
+        .key-clear, .key-back {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+        .key-clear:hover, .key-back:hover { background: rgba(255, 255, 255, 0.1); }
+        .key-clear:active { background: var(--danger); color: #fff; }
+        .key-back:active { background: var(--danger); color: #fff; }
+
+        /* 隱藏數字輸入旋鈕 */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] { -moz-appearance: textfield; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* ============================================
+           手機介面適配 (Mobile)
+           ============================================ */
+        @media (max-width: 480px) {
+            body {
+                padding: 16px 10px 88px;
+            }
+            .header h1 {
+                font-size: 1.6rem;
+            }
+            .card {
+                padding: 16px;
+                border-radius: 20px;
+            }
+            .match-item {
+                padding: 9px 7px;
+                gap: 4px;
+            }
+            .lane-select { width: 64px; font-size: 0.76rem; }
+            .kda-inputs input { width: 34px; padding: 7px 1px; }
+            .mvp-select, .badge-select { width: 72px; font-size: 0.76rem; }
+            .match-kda-display { min-width: 42px; font-size: 0.76rem; }
+            .settings-header { padding: 14px 16px; }
+            .settings-body { padding: 0 16px 16px; }
+            .keypad {
+                bottom: 12px;
+                padding: 8px;
+            }
+            .key { font-size: 1rem; padding: 9px 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="aurora">
+        <div class="aurora-blob b1"></div>
+        <div class="aurora-blob b2"></div>
+        <div class="aurora-blob b3"></div>
+    </div>
+    <div class="particles" id="particlesContainer"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1 id="title-text"></h1>
+            <div class="subtitle" id="subtitle-text"></div>
+            <div class="lang-selector">
+                <select id="langSelect">
+                    <option value="zh-tw">繁體</option>
+                    <option value="zh-cn">简体</option>
+                    <option value="en">EN</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 id="match-title" style="font-size:1.08rem; font-weight:600; color:var(--text); margin-bottom:14px; letter-spacing:-0.01em;"></h2>
+            <div class="match-list" id="matchList"></div>
+            <button class="btn-add" id="btnAddMatch"></button>
+        </div>
+
+        <button class="btn-calculate" id="btnCalculate"></button>
+
+        <div class="card result-card" id="resultCard">
+            <h2 id="result-title" style="font-size:1.08rem; font-weight:600; color:var(--text); margin-bottom:4px; letter-spacing:-0.01em;"></h2>
+            <div id="resultSummary"></div>
+            <table class="detail-table">
+                <thead>
+                    <tr>
+                        <th id="detail-header-lane"></th>
+                        <th id="detail-header-kda"></th>
+                        <th id="detail-header-raw"></th>
+                        <th id="detail-header-adj"></th>
+                        <th id="detail-header-std"></th>
+                    </tr>
+                </thead>
+                <tbody id="detailBody"></tbody>
+            </table>
+            <div class="result-fine" id="fineDisplay"></div>
+        </div>
+
+        <div class="settings-card collapsed" id="settingsCard">
+            <div class="settings-header" id="settingsToggle">
+                <h2 id="settings-title"></h2>
+                <span class="toggle-icon">▼</span>
+            </div>
+            <div class="settings-body">
+                <div class="settings-hint" id="settingsHint"></div>
+                <!-- 基本分路設定：標準KDA、加成係數 -->
+                <div id="basicLaneSettings"></div>
+                <!-- 牌子係數矩陣 -->
+                <div style="margin-top:8px;">
+                    <div style="font-size:0.85rem; color:var(--text); margin-bottom:6px; font-weight:500;" id="badgeMatrixTitle">📛 牌子係數矩陣</div>
+                    <div class="badge-matrix" id="badgeMatrix"></div>
+                </div>
+                <!-- MVP折扣係數 -->
+                <div class="setting-row" style="margin-top:8px;">
+                    <label id="mvpWinLabel">勝方MVP折扣</label>
+                    <input type="number" id="mvpWinDiscount" step="0.01" min="0" max="2" value="0.85">
+                    <label id="mvpLoseLabel" style="margin-left:12px;">敗方MVP折扣</label>
+                    <input type="number" id="mvpLoseDiscount" step="0.01" min="0" max="2" value="0.75">
+                </div>
+                <!-- 罰款單價 -->
+                <div class="setting-row">
+                    <label id="unitPriceLabel">罰款單價</label>
+                    <input type="number" id="unitPriceInput" step="1" min="0" value="1">
+                    <span class="unit" id="unitPriceUnit">元/KDA差</span>
+                </div>
+                <button class="btn-reset" id="btnResetSettings"></button>
+            </div>
+        </div>
+
+        <div class="text-muted mt-2" id="footer-text" style="text-align:center;"></div>
+    </div>
+
+    <!-- 螢幕小鍵盤 -->
+    <div class="keypad" id="keypad">
+        <div class="keypad-bar">
+            <span class="keypad-label" id="keypadLabel">🔢 數字鍵盤</span>
+            <button class="keypad-done" id="keypadDone">完成</button>
+        </div>
+        <div class="keypad-grid">
+            <button class="key" data-key="1">1</button>
+            <button class="key" data-key="2">2</button>
+            <button class="key" data-key="3">3</button>
+            <button class="key" data-key="4">4</button>
+            <button class="key" data-key="5">5</button>
+            <button class="key" data-key="6">6</button>
+            <button class="key" data-key="7">7</button>
+            <button class="key" data-key="8">8</button>
+            <button class="key" data-key="9">9</button>
+            <button class="key key-clear" data-key="clear">清空</button>
+            <button class="key" data-key="0">0</button>
+            <button class="key key-back" data-key="back">⌫</button>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ---------- 多語言設定 ----------
+            const LANGS = {
+                'zh-tw': {
+                    title: '王者榮耀每日罰款計算器',
+                    subtitle: '每日戰績 · 公正裁決',
+                    matchTitle: '📋 今日戰績',
+                    addMatch: '＋ 新增場次',
+                    calculate: '計 算 罰 款',
+                    settingsTitle: '⚙️ 系數設定',
+                    resetSettings: '恢復預設系數',
+                    unitPriceLabel: '罰款單價',
+                    unitPriceUnit: '元/KDA差',
+                    lanes: ['對抗路', '中路', '發育路', '打野', '輔助'],
+                    stdLabel: '標準',
+                    factorLabel: '加成',
+                    resultTitle: '📊 結算報告',
+                    summaryAvgAdj: '總調整 KDA 平均',
+                    summaryAvgStd: '平均標準門檻',
+                    summaryDiff: '差額',
+                    detailLane: '分路',
+                    detailKDA: 'K/D/A',
+                    detailRaw: '原始KDA',
+                    detailAdj: '調整KDA',
+                    detailStd: '有效標準',
+                    finePrefix: '💸 罰款金額：',
+                    fineSuffix: ' 元',
+                    fineFree: '✨ 今日免罰！表現達標',
+                    footer: '數據僅儲存於本機瀏覽器',
+                    deleteTitle: '刪除此場',
+                    placeholderK: 'K',
+                    placeholderD: 'D',
+                    placeholderA: 'A',
+                    mvpLabel: 'MVP',
+                    mvpNone: '無',
+                    mvpWin: '勝方MVP',
+                    mvpLose: '敗方MVP',
+                    badgeLabel: '牌子',
+                    badgeNone: '無',
+                    badgeBronze: '銅牌',
+                    badgeSilver: '銀牌',
+                    badgeGold: '金牌',
+                    badgeTop: '頂級',
+                    settingsHint: '📘 標準KDA：該分路期待的及格線。加成係數：平衡不同分路KDA膨脹（輔助易高可<1）。牌子系數：各分路拿到不同牌子的獎勵倍率，鼓勵積極表現。MVP折扣：獲得MVP時標準門檻打折，敗方MVP折扣更大以體諒逆風。',
+                    badgeMatrixTitle: '📛 牌子系數矩陣（每路×五級牌子）',
+                    mvpWinLabel: '勝方MVP折扣',
+                    mvpLoseLabel: '敗方MVP折扣'
+                },
+                'zh-cn': {
+                    title: '王者荣耀每日罚款计算器',
+                    subtitle: '每日战绩 · 公正裁决',
+                    matchTitle: '📋 今日战绩',
+                    addMatch: '＋ 新增场次',
+                    calculate: '计 算 罚 款',
+                    settingsTitle: '⚙️ 系数设定',
+                    resetSettings: '恢复默认系数',
+                    unitPriceLabel: '罚款单价',
+                    unitPriceUnit: '元/KDA差',
+                    lanes: ['对抗路', '中路', '发育路', '打野', '辅助'],
+                    stdLabel: '标准',
+                    factorLabel: '加成',
+                    resultTitle: '📊 结算报告',
+                    summaryAvgAdj: '总调整 KDA 平均',
+                    summaryAvgStd: '平均标准门槛',
+                    summaryDiff: '差额',
+                    detailLane: '分路',
+                    detailKDA: 'K/D/A',
+                    detailRaw: '原始KDA',
+                    detailAdj: '调整KDA',
+                    detailStd: '有效标准',
+                    finePrefix: '💸 罚款金额：',
+                    fineSuffix: ' 元',
+                    fineFree: '✨ 今日免罚！表现达标',
+                    footer: '数据仅储存于本机浏览器',
+                    deleteTitle: '删除此场',
+                    placeholderK: '击',
+                    placeholderD: '死',
+                    placeholderA: '助',
+                    mvpLabel: 'MVP',
+                    mvpNone: '无',
+                    mvpWin: '胜方MVP',
+                    mvpLose: '败方MVP',
+                    badgeLabel: '牌子',
+                    badgeNone: '无',
+                    badgeBronze: '铜牌',
+                    badgeSilver: '银牌',
+                    badgeGold: '金牌',
+                    badgeTop: '顶级',
+                    settingsHint: '📘 标准KDA：该分路期待的及格线。加成系数：平衡不同分路KDA膨胀（辅助易高可<1）。牌子系数：各分路拿到不同牌子的奖励倍率，鼓励积极表现。MVP折扣：获得MVP时标准门槛打折，败方MVP折扣更大以体谅逆风。',
+                    badgeMatrixTitle: '📛 牌子系数矩阵（每路×五级牌子）',
+                    mvpWinLabel: '胜方MVP折扣',
+                    mvpLoseLabel: '败方MVP折扣'
+                },
+                'en': {
+                    title: 'Honor of Kings Daily Fine Calculator',
+                    subtitle: 'Daily Stats · Fair Judgment',
+                    matchTitle: '📋 Today\'s Matches',
+                    addMatch: '+ Add Match',
+                    calculate: 'Calculate Fine',
+                    settingsTitle: '⚙️ Coefficient Settings',
+                    resetSettings: 'Reset to Default',
+                    unitPriceLabel: 'Fine Rate',
+                    unitPriceUnit: '/KDA diff',
+                    lanes: ['Top', 'Mid', 'ADC', 'Jungle', 'Support'],
+                    stdLabel: 'Std',
+                    factorLabel: 'Coeff',
+                    resultTitle: '📊 Report',
+                    summaryAvgAdj: 'Avg Adjusted KDA',
+                    summaryAvgStd: 'Avg Effective Std',
+                    summaryDiff: 'Difference',
+                    detailLane: 'Lane',
+                    detailKDA: 'K/D/A',
+                    detailRaw: 'Raw KDA',
+                    detailAdj: 'Adj KDA',
+                    detailStd: 'Eff Std',
+                    finePrefix: '💸 Fine: ',
+                    fineSuffix: '',
+                    fineFree: '✨ No fine today! Well done.',
+                    footer: 'Data stored only in this browser',
+                    deleteTitle: 'Delete this match',
+                    placeholderK: 'K',
+                    placeholderD: 'D',
+                    placeholderA: 'A',
+                    mvpLabel: 'MVP',
+                    mvpNone: 'None',
+                    mvpWin: 'Win MVP',
+                    mvpLose: 'Lose MVP',
+                    badgeLabel: 'Badge',
+                    badgeNone: 'None',
+                    badgeBronze: 'Bronze',
+                    badgeSilver: 'Silver',
+                    badgeGold: 'Gold',
+                    badgeTop: 'Top',
+                    settingsHint: '📘 Std KDA: Expected par KDA for the lane. Coeff: Balances KDA inflation (support usually high, set <1). Badge Coeff: Reward multiplier per badge grade per lane. MVP Discount: Standard threshold discount when MVP, larger for losing MVP.',
+                    badgeMatrixTitle: '📛 Badge Coefficient Matrix (Lane × Badge Grade)',
+                    mvpWinLabel: 'Win MVP Discount',
+                    mvpLoseLabel: 'Lose MVP Discount'
+                }
+            };
+
+            // 語言
+            function getCurrentLang() {
+                const saved = localStorage.getItem('fine_calculator_lang_v2');
+                if (saved && LANGS[saved]) return saved;
+                return 'zh-tw';
+            }
+            function setCurrentLang(lang) {
+                localStorage.setItem('fine_calculator_lang_v2', lang);
+            }
+            let currentLang = getCurrentLang();
+            function t(key) {
+                return LANGS[currentLang][key] || key;
+            }
+
+            // ---------- 預設設定 ----------
+            const BADGE_LEVELS = ['none', 'bronze', 'silver', 'gold', 'top'];
+            const BADGE_KEYS = ['badgeNone', 'badgeBronze', 'badgeSilver', 'badgeGold', 'badgeTop'];
+            const MVP_LEVELS = ['none', 'win', 'lose'];
+
+            function getDefaultSettings() {
+                return {
+                    lanes: [
+                        { stdKDA: 2.8, factor: 1.10, badges: { none: 1.00, bronze: 1.10, silver: 1.20, gold: 1.35, top: 1.50 } },
+                        { stdKDA: 3.5, factor: 0.95, badges: { none: 0.90, bronze: 1.05, silver: 1.15, gold: 1.30, top: 1.45 } },
+                        { stdKDA: 3.0, factor: 1.00, badges: { none: 0.90, bronze: 1.05, silver: 1.15, gold: 1.30, top: 1.45 } },
+                        { stdKDA: 3.0, factor: 1.05, badges: { none: 0.92, bronze: 1.07, silver: 1.17, gold: 1.32, top: 1.48 } },
+                        { stdKDA: 4.5, factor: 0.85, badges: { none: 0.85, bronze: 1.00, silver: 1.10, gold: 1.25, top: 1.40 } }
+                    ],
+                    unitPrice: 1,
+                    mvpWinDiscount: 0.85,
+                    mvpLoseDiscount: 0.75
+                };
+            }
+
+            // 狀態
+            let settings = loadSettings();
+            let matches = []; // 每場包含: laneIndex, kills, deaths, assists, mvpLevel ('none','win','lose'), badgeLevel ('none','bronze','silver','gold','top')
+
+            // DOM元素
+            const matchList = document.getElementById('matchList');
+            const btnAddMatch = document.getElementById('btnAddMatch');
+            const btnCalculate = document.getElementById('btnCalculate');
+            const resultCard = document.getElementById('resultCard');
+            const resultSummary = document.getElementById('resultSummary');
+            const detailBody = document.getElementById('detailBody');
+            const fineDisplay = document.getElementById('fineDisplay');
+            const settingsCard = document.getElementById('settingsCard');
+            const settingsToggle = document.getElementById('settingsToggle');
+            const basicLaneSettings = document.getElementById('basicLaneSettings');
+            const badgeMatrix = document.getElementById('badgeMatrix');
+            const mvpWinDiscount = document.getElementById('mvpWinDiscount');
+            const mvpLoseDiscount = document.getElementById('mvpLoseDiscount');
+            const unitPriceInput = document.getElementById('unitPriceInput');
+            const btnResetSettings = document.getElementById('btnResetSettings');
+            const langSelect = document.getElementById('langSelect');
+            const settingsHint = document.getElementById('settingsHint');
+            const badgeMatrixTitle = document.getElementById('badgeMatrixTitle');
+            const mvpWinLabel = document.getElementById('mvpWinLabel');
+            const mvpLoseLabel = document.getElementById('mvpLoseLabel');
+            const unitPriceLabel = document.getElementById('unitPriceLabel');
+            const unitPriceUnit = document.getElementById('unitPriceUnit');
+
+            // 設定持久化
+            function loadSettings() {
+                const stored = localStorage.getItem('fine_calculator_settings_v2');
+                if (stored) {
+                    try { return JSON.parse(stored); } catch (e) {}
+                }
+                return JSON.parse(JSON.stringify(getDefaultSettings()));
+            }
+            function saveSettings() {
+                localStorage.setItem('fine_calculator_settings_v2', JSON.stringify(settings));
+            }
+            function resetSettings() {
+                settings = JSON.parse(JSON.stringify(getDefaultSettings()));
+                saveSettings();
+                renderSettings();
+            }
+
+            // ---------- 語言切換 ----------
+            function applyLanguage(lang) {
+                currentLang = lang;
+                setCurrentLang(lang);
+                document.getElementById('title-text').textContent = t('title');
+                document.getElementById('subtitle-text').textContent = t('subtitle');
+                document.getElementById('match-title').textContent = t('matchTitle');
+                btnAddMatch.textContent = t('addMatch');
+                btnCalculate.textContent = t('calculate');
+                document.getElementById('settings-title').textContent = t('settingsTitle');
+                btnResetSettings.textContent = t('resetSettings');
+                document.getElementById('result-title').textContent = t('resultTitle');
+                document.getElementById('detail-header-lane').textContent = t('detailLane');
+                document.getElementById('detail-header-kda').textContent = t('detailKDA');
+                document.getElementById('detail-header-raw').textContent = t('detailRaw');
+                document.getElementById('detail-header-adj').textContent = t('detailAdj');
+                document.getElementById('detail-header-std').textContent = t('detailStd');
+                document.getElementById('footer-text').textContent = t('footer');
+                settingsHint.textContent = t('settingsHint');
+                badgeMatrixTitle.textContent = t('badgeMatrixTitle');
+                mvpWinLabel.textContent = t('mvpWinLabel');
+                mvpLoseLabel.textContent = t('mvpLoseLabel');
+                unitPriceLabel.textContent = t('unitPriceLabel');
+                unitPriceUnit.textContent = t('unitPriceUnit');
+                renderSettings();
+                renderMatches();
+            }
+
+            langSelect.addEventListener('change', (e) => {
+                applyLanguage(e.target.value);
+            });
+
+            // ---------- 渲染設定區 ----------
+            function renderSettings() {
+                // 基本分路設定
+                basicLaneSettings.innerHTML = '';
+                settings.lanes.forEach((lane, idx) => {
+                    const row = document.createElement('div');
+                    row.className = 'setting-row';
+                    const laneName = t('lanes')[idx] || `Lane ${idx}`;
+                    row.innerHTML = `
+                        <label>${laneName}</label>
+                        <span style="font-size:0.7rem; color:var(--text-tertiary);">${t('stdLabel')}</span>
+                        <input type="number" step="0.1" min="0" value="${lane.stdKDA}" data-lane="${idx}" data-field="stdKDA">
+                        <span style="font-size:0.7rem; color:var(--text-tertiary);">${t('factorLabel')}</span>
+                        <input type="number" step="0.01" min="0" value="${lane.factor}" data-lane="${idx}" data-field="factor">
+                    `;
+                    basicLaneSettings.appendChild(row);
+                });
+
+                // 牌子矩陣
+                badgeMatrix.innerHTML = '';
+                const badgeHeaders = ['無', '銅', '銀', '金', '頂'];
+                const headerRow = document.createElement('div');
+                headerRow.className = 'badge-row';
+                headerRow.innerHTML = '<span class="lane-label"></span>' + badgeHeaders.map(h => `<span style="width:50px; text-align:center; color:var(--text-tertiary);">${h}</span>`).join('');
+                badgeMatrix.appendChild(headerRow);
+
+                settings.lanes.forEach((lane, idx) => {
+                    const row = document.createElement('div');
+                    row.className = 'badge-row';
+                    let inputs = '';
+                    BADGE_LEVELS.forEach(level => {
+                        const val = lane.badges[level];
+                        inputs += `<input type="number" step="0.01" value="${val}" data-lane="${idx}" data-badge="${level}">`;
+                    });
+                    row.innerHTML = `<span class="lane-label">${t('lanes')[idx]}</span>${inputs}`;
+                    badgeMatrix.appendChild(row);
+                });
+
+                // MVP折扣
+                mvpWinDiscount.value = settings.mvpWinDiscount;
+                mvpLoseDiscount.value = settings.mvpLoseDiscount;
+                // 罰款單價
+                unitPriceInput.value = settings.unitPrice;
+
+                // 事件監聽
+                basicLaneSettings.querySelectorAll('input').forEach(inp => {
+                    inp.addEventListener('input', handleBasicSettingChange);
+                });
+                badgeMatrix.querySelectorAll('input').forEach(inp => {
+                    inp.addEventListener('input', handleBadgeSettingChange);
+                });
+                mvpWinDiscount.addEventListener('input', handleMVPSettingChange);
+                mvpLoseDiscount.addEventListener('input', handleMVPSettingChange);
+                unitPriceInput.addEventListener('input', handleUnitPriceChange);
+            }
+
+            function handleBasicSettingChange(e) {
+                const input = e.target;
+                const laneIdx = parseInt(input.dataset.lane);
+                const field = input.dataset.field;
+                if (!isNaN(laneIdx) && settings.lanes[laneIdx]) {
+                    settings.lanes[laneIdx][field] = parseFloat(input.value) || 0;
+                }
+                saveSettings();
+            }
+            function handleBadgeSettingChange(e) {
+                const input = e.target;
+                const laneIdx = parseInt(input.dataset.lane);
+                const badge = input.dataset.badge;
+                if (!isNaN(laneIdx) && settings.lanes[laneIdx] && badge) {
+                    settings.lanes[laneIdx].badges[badge] = parseFloat(input.value) || 0;
+                }
+                saveSettings();
+            }
+            function handleMVPSettingChange() {
+                settings.mvpWinDiscount = parseFloat(mvpWinDiscount.value) || 1;
+                settings.mvpLoseDiscount = parseFloat(mvpLoseDiscount.value) || 1;
+                saveSettings();
+            }
+            function handleUnitPriceChange() {
+                settings.unitPrice = parseFloat(unitPriceInput.value) || 0;
+                saveSettings();
+            }
+
+            settingsToggle.addEventListener('click', () => {
+                settingsCard.classList.toggle('collapsed');
+            });
+
+            btnResetSettings.addEventListener('click', resetSettings);
+
+            // ---------- 場次管理 ----------
+            function calcKDA(k, d, a) {
+                const deaths = Math.max(d, 1);
+                return (k + a) / deaths;
+            }
+
+            function createMatchElement(index) {
+                const match = matches[index];
+                const kda = calcKDA(match.kills, match.deaths, match.assists);
+                const div = document.createElement('div');
+                div.className = 'match-item';
+                div.dataset.index = index;
+
+                const laneOptions = t('lanes').map((name, i) => 
+                    `<option value="${i}" ${i === match.laneIndex ? 'selected' : ''}>${name}</option>`
+                ).join('');
+
+                const mvpOptions = [
+                    { val: 'none', text: t('mvpNone') },
+                    { val: 'win', text: t('mvpWin') },
+                    { val: 'lose', text: t('mvpLose') }
+                ].map(o => `<option value="${o.val}" ${match.mvpLevel === o.val ? 'selected' : ''}>${o.text}</option>`).join('');
+
+                const badgeOptions = [
+                    { val: 'none', text: t('badgeNone') },
+                    { val: 'bronze', text: t('badgeBronze') },
+                    { val: 'silver', text: t('badgeSilver') },
+                    { val: 'gold', text: t('badgeGold') },
+                    { val: 'top', text: t('badgeTop') }
+                ].map(o => `<option value="${o.val}" ${match.badgeLevel === o.val ? 'selected' : ''}>${o.text}</option>`).join('');
+
+                div.innerHTML = `
+                    <select class="lane-select">${laneOptions}</select>
+                    <div class="kda-inputs">
+                        <input type="number" step="1" min="0" inputmode="none" placeholder="${t('placeholderK')}" value="${match.kills}" class="kills-input">
+                        <span>/</span>
+                        <input type="number" step="1" min="0" inputmode="none" placeholder="${t('placeholderD')}" value="${match.deaths}" class="deaths-input">
+                        <span>/</span>
+                        <input type="number" step="1" min="0" inputmode="none" placeholder="${t('placeholderA')}" value="${match.assists}" class="assists-input">
+                    </div>
+                    <select class="mvp-select">${mvpOptions}</select>
+                    <select class="badge-select">${badgeOptions}</select>
+                    <span class="match-kda-display">KDA ${kda.toFixed(1)}</span>
+                    <button class="btn-icon" title="${t('deleteTitle')}">✕</button>
+                `;
+
+                const laneSelect = div.querySelector('.lane-select');
+                const killsInput = div.querySelector('.kills-input');
+                const deathsInput = div.querySelector('.deaths-input');
+                const assistsInput = div.querySelector('.assists-input');
+                const mvpSelect = div.querySelector('.mvp-select');
+                const badgeSelect = div.querySelector('.badge-select');
+                const kdaDisplay = div.querySelector('.match-kda-display');
+
+                function updateKDA() {
+                    const k = parseInt(killsInput.value) || 0;
+                    const d = parseInt(deathsInput.value) || 0;
+                    const a = parseInt(assistsInput.value) || 0;
+                    matches[index].kills = k;
+                    matches[index].deaths = d;
+                    matches[index].assists = a;
+                    const newKDA = calcKDA(k, d, a);
+                    // 動態更新：短暫放大
+                    kdaDisplay.textContent = `KDA ${newKDA.toFixed(1)}`;
+                    kdaDisplay.style.transform = 'scale(1.15)';
+                    kdaDisplay.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                    clearTimeout(kdaDisplay._t);
+                    kdaDisplay._t = setTimeout(() => { kdaDisplay.style.transform = 'scale(1)'; }, 200);
+                }
+
+                laneSelect.addEventListener('change', (e) => {
+                    matches[index].laneIndex = parseInt(e.target.value);
+                });
+                killsInput.addEventListener('input', updateKDA);
+                deathsInput.addEventListener('input', updateKDA);
+                assistsInput.addEventListener('input', updateKDA);
+
+                // 優先目標：點擊即全選，直接覆蓋原本的 0，不需先刪除
+                [killsInput, deathsInput, assistsInput].forEach(inp => {
+                    inp.addEventListener('focus', () => {
+                        inp.select();
+                        showKeypad(inp);
+                    });
+                });
+                mvpSelect.addEventListener('change', (e) => {
+                    matches[index].mvpLevel = e.target.value;
+                });
+                badgeSelect.addEventListener('change', (e) => {
+                    matches[index].badgeLevel = e.target.value;
+                });
+
+                div.querySelector('.btn-icon').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // 刪除動畫
+                    div.style.transition = 'opacity 0.3s, transform 0.3s';
+                    div.style.opacity = '0';
+                    div.style.transform = 'translateX(-30px) scale(0.95)';
+                    setTimeout(() => {
+                        matches.splice(index, 1);
+                        renderMatches();
+                    }, 280);
+                });
+
+                addRippleToButtons(div.querySelector('.btn-icon'));
+                return div;
+            }
+
+            function renderMatches() {
+                matchList.innerHTML = '';
+                matches.forEach((_, idx) => {
+                    matchList.appendChild(createMatchElement(idx));
+                });
+            }
+
+            function addMatch() {
+                matches.push({
+                    laneIndex: 2,
+                    kills: 0,
+                    deaths: 0,
+                    assists: 0,
+                    mvpLevel: 'none',
+                    badgeLevel: 'none'
+                });
+                renderMatches();
+            }
+
+            btnAddMatch.addEventListener('click', addMatch);
+
+            // ---------- 數字跳動動畫 (Spring 緩動) ----------
+            function animateValue(element, start, end, duration, prefix = '', suffix = '') {
+                const startTime = performance.now();
+                function update(now) {
+                    const elapsed = now - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    // 彈性緩動：先超越再回彈
+                    const eased = progress < 1
+                        ? 1 - Math.pow(2, -10 * progress) * Math.cos((progress * 10 - 0.75) * (2 * Math.PI) / 3)
+                        : 1;
+                    const current = Math.round(start + (end - start) * eased);
+                    element.textContent = prefix + current + suffix;
+                    if (progress < 1) {
+                        requestAnimationFrame(update);
+                    } else {
+                        element.textContent = prefix + end + suffix;
+                    }
+                }
+                requestAnimationFrame(update);
+            }
+
+            // ---------- 計算罰款 ----------
+            btnCalculate.addEventListener('click', () => {
+                if (matches.length === 0) {
+                    alert('請至少新增一場戰績！');
+                    return;
+                }
+                hideKeypad();
+
+                let totalAdjKDA = 0;
+                let totalEffStd = 0;
+                const details = [];
+
+                for (const match of matches) {
+                    const lane = settings.lanes[match.laneIndex];
+                    const rawKDA = calcKDA(match.kills, match.deaths, match.assists);
+                    // 調整KDA = 原始 * 分路加成 * 牌子係數(該路該牌)
+                    const badgeCoeff = lane.badges[match.badgeLevel] || 1;
+                    const adjKDA = rawKDA * lane.factor * badgeCoeff;
+                    totalAdjKDA += adjKDA;
+
+                    // 有效標準門檻 = 標準KDA * MVP折扣（若為MVP）
+                    let mvpDiscount = 1.0;
+                    if (match.mvpLevel === 'win') mvpDiscount = settings.mvpWinDiscount;
+                    else if (match.mvpLevel === 'lose') mvpDiscount = settings.mvpLoseDiscount;
+                    const effStd = lane.stdKDA * mvpDiscount;
+                    totalEffStd += effStd;
+
+                    details.push({
+                        laneName: t('lanes')[match.laneIndex],
+                        kills: match.kills,
+                        deaths: match.deaths,
+                        assists: match.assists,
+                        rawKDA: rawKDA,
+                        factor: lane.factor,
+                        badgeCoeff: badgeCoeff,
+                        adjKDA: adjKDA,
+                        mvpDiscount: mvpDiscount,
+                        effStd: effStd
+                    });
+                }
+
+                const avgAdj = totalAdjKDA / matches.length;
+                const avgEffStd = totalEffStd / matches.length;
+                const diff = avgEffStd - avgAdj;
+                const fineFloat = diff > 0 ? diff * settings.unitPrice : 0;
+                const fine = Math.round(fineFloat);
+
+                // 顯示摘要
+                resultSummary.innerHTML = `
+                    <div class="result-summary"><span>${t('summaryAvgAdj')}</span><strong>${avgAdj.toFixed(2)}</strong></div>
+                    <div class="result-summary"><span>${t('summaryAvgStd')}</span><strong>${avgEffStd.toFixed(2)}</strong></div>
+                    <div class="result-summary"><span>${t('summaryDiff')}</span><strong style="color:${diff > 0 ? '#ff453a' : '#30d158'}">${diff > 0 ? '-' + diff.toFixed(2) : '+' + Math.abs(diff).toFixed(2)}</strong></div>
+                `;
+
+                detailBody.innerHTML = details.map(d => `
+                    <tr>
+                        <td>${d.laneName}</td>
+                        <td>${d.kills}/${d.deaths}/${d.assists}</td>
+                        <td>${d.rawKDA.toFixed(2)}</td>
+                        <td>${d.adjKDA.toFixed(2)}</td>
+                        <td>${d.effStd.toFixed(1)}</td>
+                    </tr>
+                `).join('');
+
+                const finePrefix = t('finePrefix');
+                const fineSuffix = t('fineSuffix');
+                if (fine > 0) {
+                    fineDisplay.textContent = finePrefix + '0' + fineSuffix;
+                    animateValue(fineDisplay, 0, fine, 900, finePrefix, fineSuffix);
+                } else {
+                    fineDisplay.textContent = t('fineFree');
+                }
+
+                resultCard.classList.add('show');
+                resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+
+            // ---------- 波紋效果 ----------
+            function addRippleToButtons(button) {
+                if (!button || button.dataset.rippleBound) return;
+                button.dataset.rippleBound = 'true';
+                button.addEventListener('click', function(e) {
+                    const ripple = document.createElement('span');
+                    ripple.className = 'ripple';
+                    const rect = button.getBoundingClientRect();
+                    const size = Math.max(rect.width, rect.height);
+                    ripple.style.width = ripple.style.height = size + 'px';
+                    ripple.style.left = e.clientX - rect.left - size / 2 + 'px';
+                    ripple.style.top = e.clientY - rect.top - size / 2 + 'px';
+                    button.appendChild(ripple);
+                    ripple.addEventListener('animationend', () => ripple.remove());
+                });
+            }
+
+            function bindGlobalRipples() {
+                document.querySelectorAll('button:not(.btn-icon)').forEach(addRippleToButtons);
+            }
+
+            // ---------- 螢幕小鍵盤 ----------
+            const keypad = document.getElementById('keypad');
+            const keypadDone = document.getElementById('keypadDone');
+            let activeInput = null;
+
+            function showKeypad(input) {
+                activeInput = input;
+                keypad.classList.add('show');
+                // 確保輸入框在鍵盤上方可見，不被鍵盤遮擋
+                requestAnimationFrame(() => {
+                    const rect = input.getBoundingClientRect();
+                    const keypadH = keypad.offsetHeight;
+                    const viewportH = window.innerHeight;
+                    const overlap = rect.bottom - (viewportH - keypadH - 24);
+                    if (overlap > 0) {
+                        window.scrollBy({ top: overlap + 12, behavior: 'smooth' });
+                    }
+                });
+            }
+            function hideKeypad() {
+                keypad.classList.remove('show');
+                if (activeInput && document.activeElement === activeInput) {
+                    activeInput.blur();
+                }
+                activeInput = null;
+            }
+
+            function applyKey(k) {
+                if (!activeInput) return;
+                const inp = activeInput;
+                const start = inp.selectionStart != null ? inp.selectionStart : inp.value.length;
+                const end = inp.selectionEnd != null ? inp.selectionEnd : inp.value.length;
+                const hasSel = start !== end;
+                let val = inp.value;
+                if (k === 'back') {
+                    val = hasSel ? val.slice(0, start) + val.slice(end) : val.slice(0, -1);
+                } else if (k === 'clear') {
+                    val = '';
+                } else {
+                    if (hasSel) {
+                        val = val.slice(0, start) + k + val.slice(end);
+                    } else if (val === '0' || val === '') {
+                        val = k;
+                    } else {
+                        val = val + k;
+                    }
+                }
+                inp.value = val;
+                inp.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+
+            keypad.querySelectorAll('.key').forEach(key => {
+                // 阻止按鍵搶走輸入框焦點，保持輸入狀態（滑鼠與觸控）
+                key.addEventListener('mousedown', (e) => e.preventDefault());
+                key.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+                key.addEventListener('click', () => applyKey(key.dataset.key));
+            });
+            keypadDone.addEventListener('click', hideKeypad);
+
+            // ---------- 磁吸按鈕效果 ----------
+            function bindMagneticButton(el, strength = 0.12) {
+                el.addEventListener('mousemove', (e) => {
+                    const rect = el.getBoundingClientRect();
+                    const x = e.clientX - rect.left - rect.width / 2;
+                    const y = e.clientY - rect.top - rect.height / 2;
+                    el.style.transform = `translate(${x * strength}px, ${y * strength}px) scale(1.01)`;
+                });
+                el.addEventListener('mouseleave', () => {
+                    el.style.transform = '';
+                });
+            }
+
+            // ---------- 傾斜互動 (卡片) ----------
+            function bindTilt(el, max = 6) {
+                el.addEventListener('mousemove', (e) => {
+                    const rect = el.getBoundingClientRect();
+                    const px = (e.clientX - rect.left) / rect.width;
+                    const py = (e.clientY - rect.top) / rect.height;
+                    const rx = (py - 0.5) * -2 * max;
+                    const ry = (px - 0.5) * 2 * max;
+                    el.style.transform = `perspective(800px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-2px)`;
+                });
+                el.addEventListener('mouseleave', () => {
+                    el.style.transform = '';
+                });
+            }
+
+            // ---------- 粒子系統 ----------
+            const particlesContainer = document.getElementById('particlesContainer');
+            const particleCount = 24;
+            const particles = [];
+            let mouseX = -1000, mouseY = -1000;
+
+            function createParticles() {
+                for (let i = 0; i < particleCount; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    const size = Math.random() * 3 + 1.5;
+                    particle.style.width = size + 'px';
+                    particle.style.height = size + 'px';
+                    particle.style.left = Math.random() * 100 + '%';
+                    particle.style.top = Math.random() * 100 + '%';
+                    particle.style.opacity = Math.random() * 0.4 + 0.2;
+                    particle.origX = parseFloat(particle.style.left);
+                    particle.origY = parseFloat(particle.style.top);
+                    particle.vx = (Math.random() - 0.5) * 0.3;
+                    particle.vy = (Math.random() - 0.5) * 0.3;
+                    particlesContainer.appendChild(particle);
+                    particles.push(particle);
+                }
+            }
+
+            document.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+
+            function animateParticles() {
+                particles.forEach(p => {
+                    let x = parseFloat(p.style.left);
+                    let y = parseFloat(p.style.top);
+                    x += p.vx;
+                    y += p.vy;
+                    if (x < 0 || x > 100) p.vx *= -1;
+                    if (y < 0 || y > 100) p.vy *= -1;
+                    x = Math.min(100, Math.max(0, x));
+                    y = Math.min(100, Math.max(0, y));
+
+                    const rect = particlesContainer.getBoundingClientRect();
+                    const px = rect.left + (x / 100) * rect.width;
+                    const py = rect.top + (y / 100) * rect.height;
+                    const dx = px - mouseX;
+                    const dy = py - mouseY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const maxDist = 120;
+                    if (dist < maxDist) {
+                        const force = (1 - dist / maxDist) * 6;
+                        const angle = Math.atan2(dy, dx);
+                        const moveX = Math.cos(angle) * force;
+                        const moveY = Math.sin(angle) * force;
+                        x += (moveX / rect.width) * 100;
+                        y += (moveY / rect.height) * 100;
+                        x = Math.min(100, Math.max(0, x));
+                        y = Math.min(100, Math.max(0, y));
+                    }
+
+                    p.style.left = x + '%';
+                    p.style.top = y + '%';
+                    p.origX = x;
+                    p.origY = y;
+                });
+                requestAnimationFrame(animateParticles);
+            }
+
+            // ---------- 滾動揭示 ----------
+            function initReveal() {
+                const els = document.querySelectorAll('.reveal');
+                const io = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            io.unobserve(entry.target);
+                        }
+                    });
+                }, { threshold: 0.15 });
+                els.forEach(el => io.observe(el));
+            }
+
+            // ---------- 初始化 ----------
+            function init() {
+                langSelect.value = currentLang;
+                applyLanguage(currentLang);
+                if (matches.length === 0) addMatch();
+                bindGlobalRipples();
+                settingsCard.classList.add('collapsed');
+                createParticles();
+                animateParticles();
+                bindMagneticButton(btnCalculate, 0.08);
+                initReveal();
+            }
+
+            init();
+        })();
+    </script>
+</body>
+</html>
